@@ -1,11 +1,13 @@
-import type { EventObject, ExternalEventTypes, Options } from '@toast-ui/calendar';
-import ToastUICalendar from '@toast-ui/calendar';
-import React from 'react';
+import type {
+  EventObject,
+  ExternalEventTypes,
+  Options,
+} from "@toast-ui/calendar";
+import ToastUICalendar from "@toast-ui/calendar";
+import React, { useRef, useEffect } from "react";
 
-import { isEqual } from './isEqual';
-
-type ReactCalendarOptions = Omit<Options, 'defaultView'>;
-type CalendarView = Required<Options>['defaultView'];
+type ReactCalendarOptions = Omit<Options, "defaultView">;
+type CalendarView = Required<Options>["defaultView"];
 
 type CalendarExternalEventNames = Extract<keyof ExternalEventTypes, string>;
 type ReactCalendarEventNames = `on${Capitalize<CalendarExternalEventNames>}`;
@@ -18,143 +20,173 @@ type Props = ReactCalendarOptions & {
   height: string;
   events?: Partial<EventObject>[];
   view?: CalendarView;
+  ref: React.RefObject<ToastUICalendar | null>;
 } & ReactCalendarExternalEvents;
 
 const optionsProps: (keyof ReactCalendarOptions)[] = [
-  'useFormPopup',
-  'useDetailPopup',
-  'isReadOnly',
-  'week',
-  'month',
-  'gridSelection',
-  'usageStatistics',
-  'eventFilter',
-  'timezone',
-  'template',
+  "useFormPopup",
+  "useDetailPopup",
+  "isReadOnly",
+  "week",
+  "month",
+  "gridSelection",
+  "usageStatistics",
+  "eventFilter",
+  "timezone",
+  "template",
 ];
 
 const reactCalendarEventNames: ReactCalendarEventNames[] = [
-  'onSelectDateTime',
-  'onBeforeCreateEvent',
-  'onBeforeUpdateEvent',
-  'onBeforeDeleteEvent',
-  'onAfterRenderEvent',
-  'onClickDayName',
-  'onClickEvent',
-  'onClickMoreEventsBtn',
-  'onClickTimezonesCollapseBtn',
+  "onSelectDateTime",
+  "onBeforeCreateEvent",
+  "onBeforeUpdateEvent",
+  "onBeforeDeleteEvent",
+  "onAfterRenderEvent",
+  "onClickDayName",
+  "onClickEvent",
+  "onClickMoreEventsBtn",
+  "onClickTimezonesCollapseBtn",
 ];
 
-export default class ToastUIReactCalendar extends React.Component<Props> {
-  containerElementRef = React.createRef<HTMLDivElement>();
+const ToastUIReactCalendar: React.FC<Props> = ({
+  height = "800px",
+  events = [],
+  view = "week",
+  ref: calendarInstanceRef,
+  ...options
+}) => {
+  const containerElementRef = useRef<HTMLDivElement>(null);
+  // const calendarInstanceRef = useRef<ToastUICalendar | null>(null);
 
-  calendarInstance: ToastUICalendar | null = null;
-
-  static defaultProps = {
-    height: '800px',
-    view: 'week',
-  };
-
-  componentDidMount() {
-    const { height, events = [], view, ...options } = this.props;
-    const container = this.containerElementRef.current;
-
+  // Initialize calendar
+  useEffect(() => {
+    const container = containerElementRef.current;
     if (container) {
-      this.calendarInstance = new ToastUICalendar(container, { ...options, defaultView: view });
-
+      calendarInstanceRef.current = new ToastUICalendar(container, {
+        usageStatistics: false,
+        ...options,
+      });
       container.style.height = height;
     }
 
-    this.setEvents(events);
-    this.bindEventHandlers(options);
-  }
+    return () => {
+      calendarInstanceRef.current?.destroy();
+    };
+  }, []); // Empty dependency array ensures this runs only once on mount
 
-  shouldComponentUpdate(nextProps: Readonly<Props>) {
-    const { calendars, height, events, theme, view } = this.props;
-    const {
-      calendars: nextCalendars,
-      height: nextHeight,
-      events: nextEvents,
-      theme: nextTheme = {},
-      view: nextView = 'week',
-    } = nextProps;
-
-    if (!isEqual(height, nextHeight) && this.containerElementRef.current) {
-      this.containerElementRef.current.style.height = nextHeight;
-    }
-
-    if (!isEqual(calendars, nextCalendars)) {
-      this.setCalendars(nextCalendars);
-    }
-
-    if (!isEqual(events, nextEvents)) {
-      this.calendarInstance?.clear();
-      this.setEvents(nextEvents);
-    }
-
-    if (!isEqual(theme, nextTheme)) {
-      this.calendarInstance?.setTheme(nextTheme);
-    }
-
-    if (!isEqual(view, nextView)) {
-      this.calendarInstance?.changeView(nextView);
-    }
-
-    const nextOptions = optionsProps.reduce((acc, key) => {
-      if (!isEqual(this.props[key], nextProps[key])) {
-        acc[key] = nextProps[key];
+  // Set events when the calendar is initialized or events change
+  useEffect(() => {
+    if (calendarInstanceRef.current) {
+      if (events.length > 0) {
+        calendarInstanceRef.current.clear();
+        calendarInstanceRef.current.createEvents(events);
       }
-
-      return acc;
-    }, {} as Record<keyof Options, any>);
-
-    this.calendarInstance?.setOptions(nextOptions);
-
-    this.bindEventHandlers(nextProps);
-
-    return false;
-  }
-
-  componentWillUnmount() {
-    this.calendarInstance?.destroy();
-  }
-
-  setCalendars(calendars?: Options['calendars']) {
-    if (calendars) {
-      this.calendarInstance?.setCalendars(calendars);
     }
-  }
+  }, [events]);
 
-  setEvents(events?: Partial<EventObject>[]) {
-    if (events) {
-      this.calendarInstance?.createEvents(events);
+  // Handle changes to calendars prop
+  useEffect(() => {
+    if (options.calendars && calendarInstanceRef.current) {
+      console.log({ calendars: options.calendars });
+      calendarInstanceRef.current.setCalendars(options.calendars);
     }
-  }
+  }, [options.calendars]);
 
-  bindEventHandlers(externalEvents: ReactCalendarExternalEvents) {
-    const eventNames = Object.keys(externalEvents).filter((key) =>
-      reactCalendarEventNames.includes(key as ReactCalendarEventNames)
-    );
+  // Handle changes to theme
+  useEffect(() => {
+    if (options.theme && calendarInstanceRef.current) {
+      calendarInstanceRef.current.setTheme(options.theme);
+    }
+  }, [options.theme]);
 
-    eventNames.forEach((key) => {
-      const eventName = key[2].toLowerCase() + key.slice(3);
+  // Handle view changes
+  useEffect(() => {
+    if (calendarInstanceRef.current) {
+      calendarInstanceRef.current.changeView(view);
+    }
+  }, [view]);
 
-      if (this.calendarInstance) {
-        this.calendarInstance.off(eventName);
-        this.calendarInstance.on(eventName, externalEvents[key as ReactCalendarEventNames]);
+  // Handle height changes
+  useEffect(() => {
+    if (containerElementRef.current) {
+      containerElementRef.current.style.height = height;
+    }
+  }, [height]);
+
+  // Handle other option changes
+  useEffect(() => {
+    if (calendarInstanceRef.current) {
+      const updatedOptions = optionsProps.reduce(
+        (acc, key) => {
+          if (options[key] !== undefined) {
+            acc[key] = options[key];
+          }
+          return acc;
+        },
+        {} as Record<keyof Options, any>,
+      );
+
+      if (Object.keys(updatedOptions).length > 0) {
+        console.log(calendarInstanceRef.current.setOptions);
+        calendarInstanceRef.current.setOptions(updatedOptions);
+      }
+    }
+  }, [
+    options.useFormPopup,
+    options.useDetailPopup,
+    options.isReadOnly,
+    options.week,
+    options.month,
+    options.gridSelection,
+    options.usageStatistics,
+    options.eventFilter,
+    options.timezone,
+    options.template,
+  ]);
+
+  // Bind event handlers
+  useEffect(() => {
+    const calendar = calendarInstanceRef.current;
+    if (!calendar) return;
+
+    // Unbind existing event handlers
+    reactCalendarEventNames.forEach((reactEventName) => {
+      const eventName =
+        reactEventName[2].toLowerCase() + reactEventName.slice(3);
+      calendar.off(eventName);
+    });
+
+    // Bind new event handlers
+    reactCalendarEventNames.forEach((reactEventName) => {
+      if (options[reactEventName]) {
+        const eventName =
+          reactEventName[2].toLowerCase() + reactEventName.slice(3);
+        calendar.on(eventName, options[reactEventName]);
       }
     });
-  }
+  }, [
+    options.onSelectDateTime,
+    options.onBeforeCreateEvent,
+    options.onBeforeUpdateEvent,
+    options.onBeforeDeleteEvent,
+    options.onAfterRenderEvent,
+    options.onClickDayName,
+    options.onClickEvent,
+    options.onClickMoreEventsBtn,
+    options.onClickTimezonesCollapseBtn,
+  ]);
 
-  getInstance() {
-    return this.calendarInstance;
-  }
+  // Expose methods using React refs
+  // React.useImperativeHandle(
+  //   // containerElementRef,
+  //   calendarInstanceRef,
+  //   // React.forwardRef((props, ref) => ref),
+  //   () => ({
+  //     getInstance: () => calendarInstanceRef.current,
+  //     getRootElement: () => containerElementRef.current,
+  //   }),
+  // );
+  return <div className="container" ref={containerElementRef} />;
+};
 
-  getRootElement() {
-    return this.containerElementRef.current;
-  }
-
-  render() {
-    return <div className="container" ref={this.containerElementRef} />;
-  }
-}
+export default ToastUIReactCalendar;

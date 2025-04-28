@@ -87,7 +87,6 @@ const ToastUIReactCalendar: React.FC<Props> = ({
   // Handle changes to calendars prop
   useEffect(() => {
     if (options.calendars && calendarInstanceRef.current) {
-      console.log({ calendars: options.calendars });
       calendarInstanceRef.current.setCalendars(options.calendars);
     }
   }, [options.calendars]);
@@ -127,7 +126,6 @@ const ToastUIReactCalendar: React.FC<Props> = ({
       );
 
       if (Object.keys(updatedOptions).length > 0) {
-        console.log(calendarInstanceRef.current.setOptions);
         calendarInstanceRef.current.setOptions(updatedOptions);
       }
     }
